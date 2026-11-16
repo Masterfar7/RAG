@@ -1,0 +1,117 @@
+{
+  "name": "AI Customer Intelligence Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "incoming-ticket",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Incoming Ticket Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/ticket/process",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ticket_id\": \"{{ $json.body.ticket_id || 'TICKET-1' }}\",\n  \"customer_id\": \"{{ $json.body.customer_id || 'CUST-001' }}\",\n  \"customer_tier\": \"{{ $json.body.tier || 'standard' }}\",\n  \"query_text\": \"{{ $json.body.message }}\"\n}",
+        "options": {}
+      },
+      "id": "call-vector-hub",
+      "name": "Query Vector Hub (Chroma + Qdrant + Pinecone)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.source_used }}",
+              "operation": "equal",
+              "value2": "chroma_faq"
+            }
+          ]
+        }
+      },
+      "id": "check-faq-hit",
+      "name": "Is Instant FAQ Answer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"auto_resolved\",\n  \"reply\": \"{{ $json.direct_answer }}\",\n  \"source\": \"ChromaDB FAQ Cache\"\n}",
+        "options": {}
+      },
+      "id": "reply-instant-faq",
+      "name": "Instant Reply (Chroma)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"escalated_to_agent\",\n  \"ai_context\": {{ JSON.stringify($json.retrieved_context) }},\n  \"action\": \"routed_to_make_crm\"\n}",
+        "options": {}
+      },
+      "id": "reply-complex-query",
+      "name": "Escalate to Make CRM",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Incoming Ticket Webhook": {
+      "main": [
+        [
+          {
+            "node": "Query Vector Hub (Chroma + Qdrant + Pinecone)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Vector Hub (Chroma + Qdrant + Pinecone)": {
+      "main": [
+        [
+          {
+            "node": "Is Instant FAQ Answer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Instant FAQ Answer?": {
+      "main": [
+        [
+          {
+            "node": "Instant Reply (Chroma)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalate to Make CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

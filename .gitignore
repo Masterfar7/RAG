@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+!.env.example
+
+# Local databases & storage
+data/
+*.sqlite3
+
+# Binaries & archives
+*.exe
+*.zip
+*.tar.gz
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Other projects in directory if any
+remote_mouse/
+telegram_pc_agent/
+laptop_mcp.py
